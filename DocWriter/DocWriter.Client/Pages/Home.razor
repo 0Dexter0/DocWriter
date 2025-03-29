@@ -1,7 +1,9 @@
 ﻿@page "/"
 
-<PageTitle>Home</PageTitle>
+<div>@((MarkupString)HtmlContent)</div>
 
-<h1>Hello, world!</h1>
-
-Welcome to your new app.
+<MarkdownEditor AutoSaveEnabled="true" AutoSaveId="UploadPage"
+                Value="@_markdownValue" ValueChanged="@OnMarkdownValueChangedAsync"
+                ValueHTMLChanged="@OnMarkdownValueHTMLChanged"
+                ImageUploadEndpoint="@(NavigationManager.BaseUri + "api/images")"
+                UploadImage="true" />

@@ -1,5 +1,5 @@
-using DocWriter.Client.Pages;
 using DocWriter.Components;
+using DocWriter.Shared;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,6 +7,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents()
     .AddInteractiveWebAssemblyComponents();
+
+builder.Services.AddCommonServices();
 
 var app = builder.Build();
 
