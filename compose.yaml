@@ -1,0 +1,12 @@
+﻿services:
+  docwriter:
+    image: docwriter
+    build:
+      context: .
+      dockerfile: DocWriter/DocWriter/Dockerfile
+
+  docwriter.client:
+    image: docwriter.client
+    build:
+      context: .
+      dockerfile: DocWriter/DocWriter.Client/Dockerfile
