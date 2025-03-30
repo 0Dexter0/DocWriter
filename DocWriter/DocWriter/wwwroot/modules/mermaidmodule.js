@@ -35,3 +35,10 @@ export function updateState(dotNetObject) {
         attributeFilter: ['class'],
     });
 }
+
+export function fixEditorSize() {
+    let input = document.getElementsByClassName('CodeMirror-scroll')[0];
+    let preview = document.getElementsByClassName('editor-preview')[0];
+    input.setAttribute('style', 'height: calc(0.6 * 100vh);');
+    preview.setAttribute('style', 'height: calc(0.63 * 100vh);');
+}

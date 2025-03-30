@@ -1,7 +1,9 @@
-﻿using Markdig;
+﻿using DocWriter.Shared.Models;
+using Markdig;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.JSInterop;
+using MudBlazor;
 
 namespace DocWriter.Client.Pages;
 
@@ -29,6 +31,17 @@ public partial class Home
             "```mermaid\nstateDiagram\n    [*] --> Still\n    Still --> [*]\n\n    Still --> Moving\n    Moving --> Still\n    Moving --> Crash\n    Crash --> [*]\n```";
         NavigationManager.LocationChanged += NavigationManagerOnLocationChanged;
         NavigateToElement();
+
+        var folderTreeItems = await FolderTreeRepository.GetFolderTreeItemsAsync(null);
+
+        _treeItemData.AddRange(folderTreeItems.Select(x => new TreeItemPresenter(GetProperIcon(x), x)
+        {
+            Children = x.Children?.Select(y => new TreeItemData<FolderTreeItem>
+            {
+                Icon = GetProperIcon(y),
+                Text = y.Name
+            }).ToList() ?? []
+        }));
     }
 
     private void NavigationManagerOnLocationChanged(object sender, LocationChangedEventArgs e)
@@ -75,18 +88,18 @@ public partial class Home
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        IJSObjectReference mermaidModule;
-        if(firstRender)
-        {
-            mermaidModule = await JsRuntime.InvokeAsync<IJSObjectReference>("import", "./modules/mermaidmodule.js");
-            await mermaidModule.InvokeVoidAsync("Initialize");
-            await mermaidModule.InvokeVoidAsync("updateState", DotNetObjectReference.Create(this));
-            // await _mermaidModule.InvokeVoidAsync("Render", "mermaid");
-        }
-        else
-        {
-            mermaidModule = await JsRuntime.InvokeAsync<IJSObjectReference>("import", "./modules/mermaidmodule.js");
-            await mermaidModule.InvokeVoidAsync("RenderAll");
-        }
+        IJSObjectReference mermaidModule = await JsRuntime.InvokeAsync<IJSObjectReference>("import", "./modules/mermaidmodule.js");;
+        await mermaidModule.InvokeVoidAsync("fixEditorSize");
+
+        // if(firstRender)
+        // {
+        //     await mermaidModule.InvokeVoidAsync("Initialize");
+        //     await mermaidModule.InvokeVoidAsync("updateState", DotNetObjectReference.Create(this));
+        //     // await _mermaidModule.InvokeVoidAsync("Render", "mermaid");
+        // }
+        // else
+        // {
+        //     await mermaidModule.InvokeVoidAsync("RenderAll");
+        // }
     }
 }

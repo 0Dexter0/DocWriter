@@ -1,9 +1,97 @@
 ﻿@page "/"
+@using DocWriter.Shared
+@using DocWriter.Shared.Models
 
-<div>@((MarkupString)HtmlContent)</div>
+@* <div>@((MarkupString)HtmlContent)</div> *@
+@* *@
 
-<MarkdownEditor AutoSaveEnabled="true" AutoSaveId="UploadPage"
-                Value="@_markdownValue" ValueChanged="@OnMarkdownValueChangedAsync"
-                ValueHTMLChanged="@OnMarkdownValueHTMLChanged"
-                ImageUploadEndpoint="@(NavigationManager.BaseUri + "api/images")"
-                UploadImage="true" />
+<MudGrid Style="height: 100%;">
+    <MudItem>
+        <MudDrawer @bind-Open="@_isDrawerOpen" Anchor="Anchor.Left" Width="300px" Variant="DrawerVariant.Mini" ClipMode="DrawerClipMode.Always">
+            <MudDrawerHeader>
+                <MudIconButton @onclick="ToggleDrawer" Icon="@(_isDrawerOpen ? Icons.Material.Filled.ArrowLeft : Icons.Material.Filled.ArrowRight)" Style="margin-left: -20px;" />
+            </MudDrawerHeader>
+            @if (_isDrawerOpen)
+            {
+                <MudDrawerContainer Class="mud-height-full">
+                    <MudPaper Width="300px" Height="100%" Elevation="0">
+                        <MudStack AlignItems="AlignItems.Start">
+                            <MudTextField T="string" Label="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" TextChanged="OnTextChanged" Immediate="true" Clearable="true"/>
+                            <MudTreeView Items="@_treeItemData" @ref="_treeView" FilterFunc="MatchesName">
+                                <ItemTemplate>
+                                    <MudTreeViewItem @bind-Expanded="@context.Expanded" Items="@context.Children" Value="@context.Value"
+                                                     Icon="@context.Icon" Text="@context.Text" Visible="@context.Visible"/>
+                                </ItemTemplate>
+                            </MudTreeView>
+                        </MudStack>
+                    </MudPaper>
+                </MudDrawerContainer>
+            }
+        </MudDrawer>
+    </MudItem>
+    <MudItem>
+        <MarkdownEditor AutoSaveEnabled="true" AutoSaveId="UploadPage"
+                        Value="@_markdownValue" ValueChanged="@OnMarkdownValueChangedAsync"
+                        ValueHTMLChanged="@OnMarkdownValueHTMLChanged"
+                        ImageUploadEndpoint="@(NavigationManager.BaseUri + "api/images")"
+                        UploadImage="true" />
+    </MudItem>
+</MudGrid>
+
+
+
+
+                
+@code {
+    private List<TreeItemData<FolderTreeItem>> _treeItemData = [];
+
+    private MudTreeView<FolderTreeItem> _treeView;
+    private string _searchPhrase;
+    
+    bool _isDrawerOpen = true;
+
+    [Inject]
+    public IFolderTreeRepository FolderTreeRepository { get; init; }
+
+    private async void OnTextChanged(string searchPhrase)
+    {
+        _searchPhrase = searchPhrase;
+        await _treeView.FilterAsync();
+    }
+
+    private Task<bool> MatchesName(TreeItemData<FolderTreeItem> item)
+    {
+        if (string.IsNullOrEmpty(item.Text))
+        {
+            return Task.FromResult(false);
+        }
+
+        return Task.FromResult(item.Text.Contains(_searchPhrase, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private string GetProperIcon(FolderTreeItem item)
+    {
+        return item.Type switch
+        {
+            FolderTreeItemType.Folder => Icons.Material.Filled.Folder,
+            FolderTreeItemType.Markdown => Icons.Custom.FileFormats.FileDocument,
+            FolderTreeItemType.Image => Icons.Custom.FileFormats.FileImage,
+            _ => Icons.Material.Filled.QuestionAnswer
+        };
+    }
+
+    private class TreeItemPresenter : TreeItemData<FolderTreeItem>
+    {
+        public TreeItemPresenter(string icon, FolderTreeItem item) : base(item)
+        {
+            Text = item.Name;
+            Icon = icon;
+            Value = item;
+        }
+    }
+
+    private void ToggleDrawer()
+    {
+        _isDrawerOpen = !_isDrawerOpen;
+    }
+}

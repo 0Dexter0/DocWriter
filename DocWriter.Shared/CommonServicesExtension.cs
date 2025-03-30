@@ -8,5 +8,6 @@ public static class CommonServicesExtension
     public static void AddCommonServices(this IServiceCollection services)
     {
         services.AddMudServices();
+        services.AddTransient<IFolderTreeRepository, FolderTreeRepository>();
     }
 }
