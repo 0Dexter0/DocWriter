@@ -9,5 +9,6 @@ public static class CommonServicesExtension
     {
         services.AddMudServices();
         services.AddTransient<IFolderTreeRepository, FolderTreeRepository>();
+        services.AddSingleton<IEditorFullScreenModeValueHolder, EditorFullScreenModeValueHolder>();
     }
 }

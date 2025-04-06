@@ -5,27 +5,20 @@ export async function Initialize() {
     await mermaid.run();
 }
 
-export async function RenderAll() {
-    await mermaid.run(); 
-} 
-// export function Render(componentId, definition) {
-//     var elements = document.getElementsByClassName(componentId);
-//     let index = 1;
-//     for(const element of elements)
-//     {
-//         mermaid.render(`id-${index++}`, element.innerText)
-//             .then(result => element.innerHTML = result.svg)
-//     }
-// }
-
-export function updateState(dotNetObject) {
-    let container = document.getElementsByClassName('CodeMirror')[0];
+export function updateFullScreenState(dotNetObject) {
+    let container = document.getElementsByClassName('editor-toolbar')[0];
 
     const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
+        mutations.forEach( (mutation) => {
             if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-                console.log('Button class updated:', container.className);
-                dotNetObject.invokeMethodAsync('StateHasChangedFromJs');
+
+                if (container.className === 'editor-toolbar fullscreen') {
+                    container.style.background = 'inherit';
+                    dotNetObject.invokeMethodAsync('ToggleFullScreen');
+                }
+                else if (container.className === 'editor-toolbar') {
+                    dotNetObject.invokeMethodAsync('ToggleFullScreen');
+                }
             }
         });
     });
@@ -34,11 +27,4 @@ export function updateState(dotNetObject) {
         attributes: true,
         attributeFilter: ['class'],
     });
-}
-
-export function fixEditorSize() {
-    let input = document.getElementsByClassName('CodeMirror-scroll')[0];
-    let preview = document.getElementsByClassName('editor-preview')[0];
-    input.setAttribute('style', 'height: calc(0.6 * 100vh);');
-    preview.setAttribute('style', 'height: calc(0.63 * 100vh);');
 }

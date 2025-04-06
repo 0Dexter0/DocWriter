@@ -1,5 +1,5 @@
-﻿using DocWriter.Shared.Models;
-using Markdig;
+﻿using DocWriter.Shared;
+using DocWriter.Shared.Models;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.JSInterop;
@@ -11,6 +11,13 @@ public partial class Home
 {
     private string _markdownValue;
 
+    private string _visibility = "visible";
+    private bool _isFullScreen = false;
+    private List<TreeItemData<FolderTreeItem>> _treeItemData = [];
+    private MudTreeView<FolderTreeItem> _treeView;
+    private string _searchPhrase;
+    private bool _isDrawerOpen = true;
+
     private string HtmlContent { get; set; }
 
     [Inject]
@@ -19,9 +26,23 @@ public partial class Home
     [Inject]
     private NavigationManager NavigationManager { get; set; }
 
+    [Inject]
+    private IEditorFullScreenModeValueHolder EditorFullScreenModeValueHolder { get; set; }
+
+    [Inject]
+    private IFolderTreeRepository FolderTreeRepository { get; init; }
+
     [JSInvokable]
     public void StateHasChangedFromJs()
     {
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void ToggleFullScreen()
+    {
+        EditorFullScreenModeValueHolder.InvokeFullScreenChanged(!_isFullScreen);
+        _isFullScreen = !_isFullScreen;
         StateHasChanged();
     }
 
@@ -34,14 +55,45 @@ public partial class Home
 
         var folderTreeItems = await FolderTreeRepository.GetFolderTreeItemsAsync(null);
 
-        _treeItemData.AddRange(folderTreeItems.Select(x => new TreeItemPresenter(GetProperIcon(x), x)
+        _treeItemData.AddRange(
+            folderTreeItems.Select(
+                x => new TreeItemData<FolderTreeItem>
+                {
+                    Icon = GetProperIcon(x),
+                    Text = x.Name,
+                    Children = x.Children?.Select(
+                                y => new TreeItemData<FolderTreeItem>
+                                {
+                                    Icon = GetProperIcon(y),
+                                    Text = y.Name
+                                })
+                            .ToList()
+                        ?? []
+                }));
+
+        EditorFullScreenModeValueHolder.IsFullScreenChanged += (sender, b) =>
         {
-            Children = x.Children?.Select(y => new TreeItemData<FolderTreeItem>
-            {
-                Icon = GetProperIcon(y),
-                Text = y.Name
-            }).ToList() ?? []
-        }));
+            _visibility = b ? "hidden" : "visible";
+            StateHasChanged();
+        };
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        IJSObjectReference mermaidModule =
+            await JsRuntime.InvokeAsync<IJSObjectReference>("import", "./modules/mermaidmodule.js");
+
+        if (firstRender)
+        {
+            await mermaidModule.InvokeVoidAsync("Initialize");
+            await mermaidModule.InvokeVoidAsync("updateFullScreenState", DotNetObjectReference.Create(this));
+
+            // await _mermaidModule.InvokeVoidAsync("Render", "mermaid");
+        }
+        else
+        {
+            // await mermaidModule.InvokeVoidAsync("RenderAll");
+        }
     }
 
     private void NavigationManagerOnLocationChanged(object sender, LocationChangedEventArgs e)
@@ -72,12 +124,14 @@ public partial class Home
     private Task OnMarkdownValueChangedAsync(string value)
     {
         _markdownValue = value;
+
         return Task.CompletedTask;
     }
 
     private Task OnMarkdownValueHTMLChanged(string value)
     {
         HtmlContent = value;
+
         return Task.CompletedTask;
     }
 
@@ -86,20 +140,35 @@ public partial class Home
         JsRuntime.InvokeVoidAsync("scrollToElementId", elementId).GetAwaiter().GetResult();
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    private async void OnTextChanged(string searchPhrase)
     {
-        IJSObjectReference mermaidModule = await JsRuntime.InvokeAsync<IJSObjectReference>("import", "./modules/mermaidmodule.js");;
-        await mermaidModule.InvokeVoidAsync("fixEditorSize");
+        _searchPhrase = searchPhrase;
+        await _treeView.FilterAsync();
+    }
 
-        // if(firstRender)
-        // {
-        //     await mermaidModule.InvokeVoidAsync("Initialize");
-        //     await mermaidModule.InvokeVoidAsync("updateState", DotNetObjectReference.Create(this));
-        //     // await _mermaidModule.InvokeVoidAsync("Render", "mermaid");
-        // }
-        // else
-        // {
-        //     await mermaidModule.InvokeVoidAsync("RenderAll");
-        // }
+    private Task<bool> MatchesName(TreeItemData<FolderTreeItem> item)
+    {
+        if (string.IsNullOrEmpty(item.Text))
+        {
+            return Task.FromResult(false);
+        }
+
+        return Task.FromResult(item.Text.Contains(_searchPhrase, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private string GetProperIcon(FolderTreeItem item)
+    {
+        return item.Type switch
+        {
+            FolderTreeItemType.Folder => Icons.Material.Filled.Folder,
+            FolderTreeItemType.Markdown => Icons.Custom.FileFormats.FileDocument,
+            FolderTreeItemType.Image => Icons.Custom.FileFormats.FileImage,
+            _ => Icons.Material.Filled.QuestionAnswer
+        };
+    }
+
+    private void ToggleDrawer()
+    {
+        _isDrawerOpen = !_isDrawerOpen;
     }
 }
