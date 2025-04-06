@@ -86,13 +86,13 @@ public partial class Home
         if (firstRender)
         {
             await mermaidModule.InvokeVoidAsync("Initialize");
-            await mermaidModule.InvokeVoidAsync("updateFullScreenState", DotNetObjectReference.Create(this));
+            await mermaidModule.InvokeVoidAsync("editorStateChangingHandler", DotNetObjectReference.Create(this));
 
-            // await _mermaidModule.InvokeVoidAsync("Render", "mermaid");
+            // await mermaidModule.InvokeVoidAsync("Render", "mermaid");
         }
         else
         {
-            // await mermaidModule.InvokeVoidAsync("RenderAll");
+            await mermaidModule.InvokeVoidAsync("RenderAll");
         }
     }
 
