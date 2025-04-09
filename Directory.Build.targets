@@ -1,0 +1,7 @@
+<Project>
+    <ItemGroup>
+        <Compile Update="**\*.cs">
+            <DependentUpon>$([System.String]::Copy('%(FileName)').Substring(1)).cs</DependentUpon>
+        </Compile>
+    </ItemGroup>
+</Project>

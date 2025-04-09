@@ -1,0 +1,12 @@
+<div style="height: 100%; width: 100%">
+    @if (_showProgressBar)
+    {
+        <div style="display: flex; justify-content: center; align-items: center; height: 100%; width: 100%; overflow: unset">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true"/>
+        </div>
+    }
+    else
+    {
+        @((MarkupString)_content)
+    }
+</div>

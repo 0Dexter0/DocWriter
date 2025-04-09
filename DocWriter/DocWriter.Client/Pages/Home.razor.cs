@@ -1,5 +1,7 @@
 ﻿using DocWriter.Shared;
 using DocWriter.Shared.Models;
+using DocWriter.Shared.Providers;
+using DocWriter.Shared.Repositories;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.JSInterop;
@@ -7,18 +9,19 @@ using MudBlazor;
 
 namespace DocWriter.Client.Pages;
 
-public partial class Home
+public partial class Home : IDisposable
 {
     private string _markdownValue;
-
-    private string _visibility = "visible";
-    private bool _isFullScreen = false;
-    private List<TreeItemData<FolderTreeItem>> _treeItemData = [];
-    private MudTreeView<FolderTreeItem> _treeView;
+    private bool _isFullScreen;
+    private bool _editMode;
+    private bool _disposed;
     private string _searchPhrase;
+    private string _editFilePath;
+    private FolderTreeItem _selectedItem;
+    private MudTreeView<FolderTreeItem> _treeView;
+    private string _visibility = "visible";
     private bool _isDrawerOpen = true;
-
-    private string HtmlContent { get; set; }
+    private readonly List<TreeItemData<FolderTreeItem>> _treeItemData = [];
 
     [Inject]
     private IJSRuntime JsRuntime { get; set; }
@@ -30,7 +33,10 @@ public partial class Home
     private IEditorFullScreenModeValueHolder EditorFullScreenModeValueHolder { get; set; }
 
     [Inject]
-    private IFolderTreeRepository FolderTreeRepository { get; init; }
+    private ITreeItemsProvider TreeItemsProvider { get; init; }
+
+    [Inject]
+    private IFileContentRepository FileContentRepository { get; init; }
 
     [JSInvokable]
     public void StateHasChangedFromJs()
@@ -46,36 +52,22 @@ public partial class Home
         StateHasChanged();
     }
 
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
     protected override async Task OnInitializedAsync()
     {
-        _markdownValue =
-            "```mermaid\nstateDiagram\n    [*] --> Still\n    Still --> [*]\n\n    Still --> Moving\n    Moving --> Still\n    Moving --> Crash\n    Crash --> [*]\n```";
         NavigationManager.LocationChanged += NavigationManagerOnLocationChanged;
         NavigateToElement();
 
-        var folderTreeItems = await FolderTreeRepository.GetFolderTreeItemsAsync(null);
+        var folderTreeItems = await TreeItemsProvider.GetTreeItemsAsync(
+            new(string.Empty, string.Empty, FolderTreeItemType.Folder));
+        _treeItemData.AddRange(folderTreeItems);
 
-        _treeItemData.AddRange(
-            folderTreeItems.Select(
-                x => new TreeItemData<FolderTreeItem>
-                {
-                    Icon = GetProperIcon(x),
-                    Text = x.Name,
-                    Children = x.Children?.Select(
-                                y => new TreeItemData<FolderTreeItem>
-                                {
-                                    Icon = GetProperIcon(y),
-                                    Text = y.Name
-                                })
-                            .ToList()
-                        ?? []
-                }));
-
-        EditorFullScreenModeValueHolder.IsFullScreenChanged += (sender, b) =>
-        {
-            _visibility = b ? "hidden" : "visible";
-            StateHasChanged();
-        };
+        EditorFullScreenModeValueHolder.IsFullScreenChanged += FullScreenVisibilityHandler;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -87,8 +79,6 @@ public partial class Home
         {
             await mermaidModule.InvokeVoidAsync("Initialize");
             await mermaidModule.InvokeVoidAsync("editorStateChangingHandler", DotNetObjectReference.Create(this));
-
-            // await mermaidModule.InvokeVoidAsync("Render", "mermaid");
         }
         else
         {
@@ -96,10 +86,29 @@ public partial class Home
         }
     }
 
-    private void NavigationManagerOnLocationChanged(object sender, LocationChangedEventArgs e)
+    protected virtual void Dispose(bool disposing)
     {
-        NavigateToElement();
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (disposing)
+        {
+            EditorFullScreenModeValueHolder.IsFullScreenChanged -= FullScreenVisibilityHandler;
+            NavigationManager.LocationChanged -= NavigationManagerOnLocationChanged;
+        }
+
+        _disposed = true;
     }
+
+    private Task<IReadOnlyCollection<TreeItemData<FolderTreeItem>>> ServerData(FolderTreeItem parent) =>
+        TreeItemsProvider.GetTreeItemsAsync(parent);
+
+    private void OnItemsLoaded(TreeItemData<FolderTreeItem> treeItemData, IReadOnlyCollection<TreeItemData<FolderTreeItem>> children) =>
+        treeItemData.Children = children?.ToList();
+
+    private void NavigationManagerOnLocationChanged(object sender, LocationChangedEventArgs e) => NavigateToElement();
 
     private void NavigateToElement()
     {
@@ -121,32 +130,23 @@ public partial class Home
         ScrollToElementId(elementId);
     }
 
-    private Task OnMarkdownValueChangedAsync(string value)
-    {
-        _markdownValue = value;
+    private void OnMarkdownValueChanged(string value) => _markdownValue = value;
 
-        return Task.CompletedTask;
+    private void ScrollToElementId(object elementId) => JsRuntime.InvokeVoidAsync("scrollToElementId", elementId).GetAwaiter().GetResult();
+
+    private void FullScreenVisibilityHandler(object _, bool b)
+    {
+        _visibility = b ? "hidden" : "visible";
+        StateHasChanged();
     }
 
-    private Task OnMarkdownValueHTMLChanged(string value)
-    {
-        HtmlContent = value;
-
-        return Task.CompletedTask;
-    }
-
-    private void ScrollToElementId(object elementId)
-    {
-        JsRuntime.InvokeVoidAsync("scrollToElementId", elementId).GetAwaiter().GetResult();
-    }
-
-    private async void OnTextChanged(string searchPhrase)
+    private Task OnTextChangedAsync(string searchPhrase)
     {
         _searchPhrase = searchPhrase;
-        await _treeView.FilterAsync();
+        return _treeView.FilterAsync();
     }
 
-    private Task<bool> MatchesName(TreeItemData<FolderTreeItem> item)
+    private Task<bool> MatchesNameAsync(TreeItemData<FolderTreeItem> item)
     {
         if (string.IsNullOrEmpty(item.Text))
         {
@@ -156,19 +156,35 @@ public partial class Home
         return Task.FromResult(item.Text.Contains(_searchPhrase, StringComparison.OrdinalIgnoreCase));
     }
 
-    private string GetProperIcon(FolderTreeItem item)
-    {
-        return item.Type switch
-        {
-            FolderTreeItemType.Folder => Icons.Material.Filled.Folder,
-            FolderTreeItemType.Markdown => Icons.Custom.FileFormats.FileDocument,
-            FolderTreeItemType.Image => Icons.Custom.FileFormats.FileImage,
-            _ => Icons.Material.Filled.QuestionAnswer
-        };
-    }
-
     private void ToggleDrawer()
     {
         _isDrawerOpen = !_isDrawerOpen;
+    }
+
+    private async Task EditItemAsync(string filePath)
+    {
+        _editMode = true;
+        _editFilePath = filePath;
+
+        string fileContent = await FileContentRepository.GetFileContentAsync(filePath);
+        _markdownValue = fileContent;
+
+        var module =
+            await JsRuntime.InvokeAsync<IJSObjectReference>("import", "./modules/mermaidmodule.js");
+        await module.InvokeVoidAsync("editorStateChangingHandler", DotNetObjectReference.Create(this));
+    }
+
+    private void DeleteItem()
+    {
+        // TODO: implement
+    }
+
+    private void CancelEdit() => _editMode = false;
+
+    private async Task SaveAsync()
+    {
+        await FileContentRepository.UpdateFileContentAsync(_editFilePath, _markdownValue);
+        _editMode = false;
+        StateHasChanged();
     }
 }

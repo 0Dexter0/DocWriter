@@ -1,6 +1,6 @@
 ﻿using DocWriter.Shared.Models;
 
-namespace DocWriter.Shared;
+namespace DocWriter.Shared.Repositories;
 
 public interface IFolderTreeRepository
 {

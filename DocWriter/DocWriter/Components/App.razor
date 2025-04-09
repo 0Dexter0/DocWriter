@@ -18,8 +18,9 @@
     <HeadOutlet @rendermode="@(new InteractiveAutoRenderMode(false))"/>
 </head>
 
-<body>
-<Routes @rendermode="@(new InteractiveAutoRenderMode(false))"/>
+<body style="height: 100vh">
+<Routes @rendermode="@(new InteractiveWebAssemblyRenderMode())"/>
+@* <Routes @rendermode="InteractiveAuto"/> *@
 <script src="_framework/blazor.web.js"></script>
 <script src="/_content/PSC.Blazor.Components.MarkdownEditor/js/easymde.min.js"></script>
 <script src="/_content/PSC.Blazor.Components.MarkdownEditor/js/markdownEditor.js"></script>

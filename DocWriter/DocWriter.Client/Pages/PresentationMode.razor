@@ -1,0 +1,93 @@
+@page "/presentation"
+@using DocWriter.Shared.Models
+
+<PageTitle>@_title</PageTitle>
+
+<MudGrid Class="mud-height-full">
+    <MudItem Class="flex-1 mud-height-full">
+        @if (!_isPresentationModeActive)
+        {
+            <MudTreeView Items="@_treeItemData" @bind-SelectedValue="@_selectedItem"
+                         SelectionMode="SelectionMode.ToggleSelection" ServerData="LoadServerData" Style="min-width: 300px">
+                <ItemTemplate>
+                    <MudTreeViewItem
+                        Value="@context.Value"
+                        Text="@context.Value!.Name"
+                        Items="@context.Children"
+                        ItemsChanged="@(new Action<IReadOnlyCollection<TreeItemData<FolderTreeItem>>>(items => OnItemsLoaded(context, items)))"
+                        @bind-Expanded="@context.Expanded"
+                        CanExpand="@context.Expandable"
+                        Icon="@context.Icon"
+                        IconExpanded="@Icons.Custom.Uncategorized.FolderOpen"
+                        LoadingIconColor="Color.Info"
+                        IconColor="@(context.Value!.ProjectRoot ? Color.Tertiary : Color.Default)"
+                        OnDoubleClick="StartPresentation">
+                    </MudTreeViewItem>
+                </ItemTemplate>
+            </MudTreeView>
+        }
+        else
+        {
+            <MudPaper Elevation="0" Class="flex-1 d-flex flex-column mud-height-full" Style="position: relative; background: inherit;">
+                <MudIconButton
+                    Icon="@Icons.Material.Filled.Close"
+                    OnClick="EndPresentation"
+                    Size="Size.Medium"
+                    Style="position: absolute; top: 10px; right: 10px; z-index: 1;"
+                    Color="Color.Warning"/>
+                <div class="flex-grow-1 mud-height-full" style="position: relative; overflow: auto;">
+                    <div class="pt-5 pl-5 mud-height-full" id="preview">
+                        <Preview FilePath="@_currentFilePath"/>
+                    </div>
+                </div>
+
+                <MudContainer Fixed MaxWidth="MaxWidth.Large" Class="">
+                    <MudPaper Class="pa-2" Elevation="1">
+                        <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+
+                            <MudIconButton OnClick="GoPrevious"
+                                       Disabled="@(_files.IndexOf(_currentFilePath) is 0)"
+                                       Variant="Variant.Text"
+                                       Size="Size.Medium"
+                                       Icon="@Icons.Material.Filled.KeyboardDoubleArrowLeft">
+                            </MudIconButton>
+
+                            <MudText Typo="Typo.body1" Align="Align.Center" Class="flex-grow-1">
+                                @_currentFilePath.Split('/').Last()
+                            </MudText>
+
+                            <MudIconButton OnClick="GoNext"
+                                       Disabled="@(_files.IndexOf(_currentFilePath) == _files.Count - 1)"
+                                       Variant="Variant.Text"
+                                       Size="Size.Medium"
+                                       Icon="@Icons.Material.Filled.KeyboardDoubleArrowRight">
+                            </MudIconButton>
+
+                        </MudStack>
+                    </MudPaper>
+                </MudContainer>
+            </MudPaper>
+        }
+    </MudItem>
+    <MudItem>
+        <MudDrawer @bind-Open="@_isDrawerOpen" Anchor="Anchor.Right" Width="300px" Variant="DrawerVariant.Mini" ClipMode="DrawerClipMode.Always">
+            <MudDrawerHeader>
+                @if (_isDrawerOpen)
+                {
+                    <MudButton StartIcon="@Icons.Material.Filled.ArrowRight" OnClick="ToggleDrawer"
+                               IconSize="Size.Large" Size="Size.Large">Navigation</MudButton>
+                }
+                else
+                {
+                    <MudIconButton @onclick="ToggleDrawer" Icon="@Icons.Material.Filled.ArrowLeft" Style="margin-left: -20px;"/>
+                }
+            </MudDrawerHeader>
+            @if (_isDrawerOpen)
+            {
+                <MudNavMenu>
+                    <MudNavLink Href="/">Home</MudNavLink>
+                </MudNavMenu>
+            }
+        </MudDrawer>
+    </MudItem>
+</MudGrid>
