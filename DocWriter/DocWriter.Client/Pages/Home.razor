@@ -8,58 +8,79 @@
                 <MudDrawerHeader>
                     <MudIconButton @onclick="ToggleDrawer" Icon="@(_isDrawerOpen ? Icons.Material.Filled.ArrowLeft : Icons.Material.Filled.ArrowRight)" Style="margin-left: -20px;"/>
                 </MudDrawerHeader>
-                @if (_isDrawerOpen)
-                {
-                    <MudDrawerContainer Class="mud-height-full">
-                        <MudPaper Width="300px" Height="100%" Elevation="0">
-                            <MudStack AlignItems="AlignItems.Start">
-                                <MudTextField T="string" Label="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" TextChanged="OnTextChangedAsync" Immediate="true" Clearable="true"/>
-                                <MudTreeView Items="@_treeItemData" FilterFunc="MatchesNameAsync" @bind-SelectedValue="@_selectedItem"
-                                             SelectionMode="SelectionMode.ToggleSelection" ServerData="ServerData"
-                                             @ref="_treeView" Width="300px">
-                                    <ItemTemplate>
-                                        <MudTreeViewItem
-                                            Value="@context.Value"
-                                            Text="@context.Value!.Name"
-                                            Items="@context.Children"
-                                            ItemsChanged="@(new Action<IReadOnlyCollection<TreeItemData<FolderTreeItem>>>(items => OnItemsLoaded(context, items)))"
-                                            @bind-Expanded="@context.Expanded"
-                                            CanExpand="@context.Expandable"
-                                            Icon="@context.Icon"
-                                            IconExpanded="@Icons.Custom.Uncategorized.FolderOpen"
-                                            IconColor="@(context.Value!.ProjectRoot ? Color.Tertiary : Color.Default)"
-                                            LoadingIconColor="Color.Info">
-                                            <BodyContent Context="inner">
-                                                <div style="display: grid; grid-template-columns: 1fr auto; align-items: center; width: 100%">
-                                                    <MudText Style="justify-self: start;">@inner.Text</MudText>
-                                                    <div style="justify-self: end;">
-                                                        <MudMenu Icon="@Icons.Material.Filled.MoreVert" Dense="true" AnchorOrigin="Origin.TopRight" TransformOrigin="Origin.TopRight">
+                @* @if (_isDrawerOpen) *@
+                <MudDrawerContainer Class="@("mud-height-full " + (!_isDrawerOpen ? "overflow-x-hidden" : ""))" Style="@("visibility: " + (_isDrawerOpen ? "visible" : "hidden"))">
+                    <MudPaper Width="300px" Height="100%" Elevation="0">
+                        <MudStack AlignItems="AlignItems.Start" Class="mud-hidden">
+                            <MudTreeView Items="@_treeItemData" @bind-SelectedValue="@_selectedItem"
+                                         SelectionMode="SelectionMode.ToggleSelection" ServerData="ServerData"
+                                         Width="300px">
+                                <ItemTemplate Context="context">
+                                    <MudTreeViewItem
+                                        Value="@context.Value"
+                                        Text="@context.Value!.Name"
+                                        Items="@context.Children"
+                                        ItemsChanged="@(new Action<IReadOnlyCollection<TreeItemData<FolderTreeItem>>>(items => OnItemsLoaded(context, items)))"
+                                        @bind-Expanded="@context.Expanded"
+                                        CanExpand="@context.Expandable"
+                                        Icon="@context.Icon"
+                                        IconExpanded="@Icons.Custom.Uncategorized.FolderOpen"
+                                        IconColor="@(context.Value!.ProjectRoot ? Color.Tertiary : Color.Default)"
+                                        LoadingIconColor="Color.Info">
+                                        <BodyContent Context="inner">
+                                            <div style="display: grid; grid-template-columns: 1fr auto; align-items: center; width: 100%">
+                                                <MudText Style="justify-self: start;">@context.Text</MudText>
+                                                <div style="justify-self: end;">
+                                                    <MudMenu Icon="@Icons.Material.Filled.MoreVert" Dense="true" AnchorOrigin="Origin.TopRight" TransformOrigin="Origin.TopRight">
+                                                        @if(inner.Text != "Root")
+                                                        {
                                                             @if (inner.Value!.Type is FolderTreeItemType.Markdown)
                                                             {
-                                                                <MudMenuItem Label="Edit" Icon="@Icons.Material.Filled.Edit" OnClick="@(() => EditItemAsync(inner.Value.Path))"/>
+                                                                <MudMenuItem Label="Edit" Icon="@Icons.Material.Filled.EditNote" OnClick="@(() => EditItemAsync(inner.Value.Path))"/>
                                                             }
-                                                            <MudMenuItem Label="Delete" Icon="@Icons.Material.Filled.Delete" OnClick="DeleteItem"/>
-                                                        </MudMenu>
-                                                    </div>
+                                                            @if (inner.Value.Name != "Images")
+                                                            {
+                                                                <MudMenuItem Label="Rename" Icon="@Icons.Material.Filled.Edit" OnClick="@(() => RenameItemAsync(context))"/>
+                                                            }
+                                                            @if (inner.Value is { Type: FolderTreeItemType.Folder, Name: not "Images" })
+                                                            {
+                                                                <MudMenuItem Label="Create file" Icon="@Icons.Material.Filled.NoteAdd" OnClick="@(() => DeleteItemAsync(context))"/>
+                                                            }
+                                                            @if (inner.Value is { Type: FolderTreeItemType.Folder, ProjectRoot: true })
+                                                            {
+                                                                <MudMenuItem Label="Create folder" Icon="@Icons.Material.Filled.CreateNewFolder" OnClick="@(() => DeleteItemAsync(context))"/>
+                                                            }
+                                                            @if (inner.Value is { Type: FolderTreeItemType.Folder, ProjectRoot: false } && !IsItemInProject(inner.Value.Path))
+                                                            {
+                                                                <MudMenuItem Label="Create project" Icon="@Icons.Material.Filled.FolderSpecial" OnClick="@(() => DeleteItemAsync(context))"/>
+                                                            }
+                                                            <MudMenuItem Label="Delete" Icon="@Icons.Material.Filled.Delete" OnClick="@(() => DeleteItemAsync(context))"/>
+                                                        }
+                                                        else
+                                                        {
+                                                            <MudMenuItem Label="Create folder" Icon="@Icons.Material.Filled.CreateNewFolder" OnClick="@(() => DeleteItemAsync(context))"/>
+                                                            <MudMenuItem Label="Create project" Icon="@Icons.Material.Filled.FolderSpecial" OnClick="@(() => DeleteItemAsync(context))"/>
+                                                        }
+                                                    </MudMenu>
                                                 </div>
-                                            </BodyContent>
-                                        </MudTreeViewItem>
-                                    </ItemTemplate>
-                                </MudTreeView>
-                            </MudStack>
-                        </MudPaper>
-                    </MudDrawerContainer>
-                }
+                                            </div>
+                                        </BodyContent>
+                                    </MudTreeViewItem>
+                                </ItemTemplate>
+                            </MudTreeView>
+                        </MudStack>
+                    </MudPaper>
+                </MudDrawerContainer>
             </MudDrawer>
         </MudItem>
     </div>
     <MudItem Class="mud-width-full">
         <div class="ma-5 mud-height-full">
-            @if (!_editMode)
+            @if (!_editMode && _selectedItem?.Type is FolderTreeItemType.Markdown)
             {
                 <Preview FilePath="@_selectedItem?.Path" />
             }
-            else
+            @if (_editMode)
             {
                 <MarkdownEditor
                     Value="@_markdownValue" ValueChanged="@OnMarkdownValueChanged"

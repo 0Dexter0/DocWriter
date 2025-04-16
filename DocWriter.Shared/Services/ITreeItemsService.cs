@@ -1,9 +1,11 @@
 using DocWriter.Shared.Models;
 using MudBlazor;
 
-namespace DocWriter.Shared.Providers;
+namespace DocWriter.Shared.Services;
 
-public interface ITreeItemsProvider
+public interface ITreeItemsService
 {
     Task<IReadOnlyCollection<TreeItemData<FolderTreeItem>>> GetTreeItemsAsync(FolderTreeItem parent);
+
+    Task<bool> DeleteAsync(FolderTreeItem item);
 }

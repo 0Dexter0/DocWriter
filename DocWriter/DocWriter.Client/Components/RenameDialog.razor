@@ -1,0 +1,14 @@
+<MudDialog OnKeyDown="HandleKeyDownAsync">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            Rename @Type
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="@_updated" Clearable Immediate TextChanged="StillDisabled"/>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Success" OnClick="RenameAsync" Disabled="@_disabled">Rename</MudButton>
+    </DialogActions>
+</MudDialog>

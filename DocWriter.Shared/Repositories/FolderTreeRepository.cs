@@ -13,7 +13,19 @@ public class FolderTreeRepository : IFolderTreeRepository
 
     public Task<FolderTreeItem> CreateFolderTreeItemAsync(FolderTreeItem item) => throw new NotImplementedException();
 
-    public Task<FolderTreeItem> UpdateFolderTreeItemAsync(FolderTreeItem item) => throw new NotImplementedException();
+    public async Task<FolderTreeItem> UpdateFolderTreeItemAsync(RenameFolderTreeItem item)
+    {
+        var original = DataStorageMock.FolderTreeMock.Single(x => x.Path == item.Path);
 
-    public Task DeleteFolderTreeItemAsync(FolderTreeItem item) => throw new NotImplementedException();
+        original = original with { Name = item.NewName, Path = original.Path.Replace(original.Name, item.NewName) };
+        await Task.Delay(300);
+
+        return original;
+    }
+
+    public Task<bool> DeleteFolderTreeItemAsync(FolderTreeItem item)
+    {
+        DataStorageMock.FolderTreeMock.Remove(item);
+        return Task.FromResult(true);
+    }
 }

@@ -1,5 +1,5 @@
-﻿using DocWriter.Shared.Providers;
-using DocWriter.Shared.Repositories;
+﻿using DocWriter.Shared.Repositories;
+using DocWriter.Shared.Services;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor.Services;
 
@@ -13,6 +13,7 @@ public static class CommonServicesExtension
         services.AddTransient<IFolderTreeRepository, FolderTreeRepository>();
         services.AddSingleton<IEditorFullScreenModeValueHolder, EditorFullScreenModeValueHolder>();
         services.AddTransient<IFileContentRepository, FileContentRepository>();
-        services.AddSingleton<ITreeItemsProvider, TreeItemsProvider>();
+        services.AddSingleton<ITreeItemsService, TreeItemsService>();
+        services.AddMemoryCache(opt => opt.ExpirationScanFrequency = TimeSpan.FromMinutes(10));
     }
 }

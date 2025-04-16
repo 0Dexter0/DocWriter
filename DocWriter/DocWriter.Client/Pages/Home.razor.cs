@@ -1,7 +1,8 @@
-﻿using DocWriter.Shared;
+﻿using DocWriter.Client.Components;
+using DocWriter.Shared;
 using DocWriter.Shared.Models;
-using DocWriter.Shared.Providers;
 using DocWriter.Shared.Repositories;
+using DocWriter.Shared.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.JSInterop;
@@ -15,28 +16,33 @@ public partial class Home : IDisposable
     private bool _isFullScreen;
     private bool _editMode;
     private bool _disposed;
-    private string _searchPhrase;
     private string _editFilePath;
     private FolderTreeItem _selectedItem;
-    private MudTreeView<FolderTreeItem> _treeView;
     private string _visibility = "visible";
     private bool _isDrawerOpen = true;
     private readonly List<TreeItemData<FolderTreeItem>> _treeItemData = [];
+    private readonly Dictionary<string, TreeItemData<FolderTreeItem>> _itemsMap = [];
 
     [Inject]
-    private IJSRuntime JsRuntime { get; set; }
+    private IJSRuntime JsRuntime { get; init; }
 
     [Inject]
-    private NavigationManager NavigationManager { get; set; }
+    private NavigationManager NavigationManager { get; init; }
 
     [Inject]
-    private IEditorFullScreenModeValueHolder EditorFullScreenModeValueHolder { get; set; }
+    private IEditorFullScreenModeValueHolder EditorFullScreenModeValueHolder { get; init; }
 
     [Inject]
-    private ITreeItemsProvider TreeItemsProvider { get; init; }
+    private ITreeItemsService TreeItemsService { get; init; }
 
     [Inject]
     private IFileContentRepository FileContentRepository { get; init; }
+
+    [Inject]
+    private IDialogService DialogService { get; init; }
+
+    [Inject]
+    private ISnackbar Snackbar { get; init; }
 
     [JSInvokable]
     public void StateHasChangedFromJs()
@@ -63,9 +69,32 @@ public partial class Home : IDisposable
         NavigationManager.LocationChanged += NavigationManagerOnLocationChanged;
         NavigateToElement();
 
-        var folderTreeItems = await TreeItemsProvider.GetTreeItemsAsync(
+        TreeItemData<FolderTreeItem> root = new()
+        {
+            Icon = Icons.Material.Filled.Folder,
+            Expandable = false,
+            Text = "Root",
+            Value = new("Root", String.Empty, FolderTreeItemType.Folder)
+        };
+
+        var folderTreeItems = await TreeItemsService.GetTreeItemsAsync(
             new(string.Empty, string.Empty, FolderTreeItemType.Folder));
-        _treeItemData.AddRange(folderTreeItems);
+        _treeItemData.Add(root);
+        _itemsMap[String.Empty] = root;
+
+        if (folderTreeItems.Any())
+        {
+            root.Children = folderTreeItems.ToList();
+            root.Expandable = true;
+            root.Expanded = true;
+
+            foreach (var item in folderTreeItems)
+            {
+                _itemsMap[item.Value!.Path] = item;
+            }
+
+            StateHasChanged();
+        }
 
         EditorFullScreenModeValueHolder.IsFullScreenChanged += FullScreenVisibilityHandler;
     }
@@ -102,8 +131,17 @@ public partial class Home : IDisposable
         _disposed = true;
     }
 
-    private Task<IReadOnlyCollection<TreeItemData<FolderTreeItem>>> ServerData(FolderTreeItem parent) =>
-        TreeItemsProvider.GetTreeItemsAsync(parent);
+    private async Task<IReadOnlyCollection<TreeItemData<FolderTreeItem>>> ServerData(FolderTreeItem parent)
+    {
+        var items = await TreeItemsService.GetTreeItemsAsync(parent);
+
+        foreach (var item in items)
+        {
+            _itemsMap[item.Value!.Path] = item;
+        }
+
+        return items;
+    }
 
     private void OnItemsLoaded(TreeItemData<FolderTreeItem> treeItemData, IReadOnlyCollection<TreeItemData<FolderTreeItem>> children) =>
         treeItemData.Children = children?.ToList();
@@ -140,26 +178,7 @@ public partial class Home : IDisposable
         StateHasChanged();
     }
 
-    private Task OnTextChangedAsync(string searchPhrase)
-    {
-        _searchPhrase = searchPhrase;
-        return _treeView.FilterAsync();
-    }
-
-    private Task<bool> MatchesNameAsync(TreeItemData<FolderTreeItem> item)
-    {
-        if (string.IsNullOrEmpty(item.Text))
-        {
-            return Task.FromResult(false);
-        }
-
-        return Task.FromResult(item.Text.Contains(_searchPhrase, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private void ToggleDrawer()
-    {
-        _isDrawerOpen = !_isDrawerOpen;
-    }
+    private void ToggleDrawer() => _isDrawerOpen = !_isDrawerOpen;
 
     private async Task EditItemAsync(string filePath)
     {
@@ -174,17 +193,85 @@ public partial class Home : IDisposable
         await module.InvokeVoidAsync("editorStateChangingHandler", DotNetObjectReference.Create(this));
     }
 
-    private void DeleteItem()
-    {
-        // TODO: implement
-    }
-
     private void CancelEdit() => _editMode = false;
 
     private async Task SaveAsync()
     {
         await FileContentRepository.UpdateFileContentAsync(_editFilePath, _markdownValue);
         _editMode = false;
+        StateHasChanged();
+    }
+
+    private bool IsItemInProject(string path)
+    {
+        string[] selectedItemPathSections = path.Split('/');
+
+        if (!selectedItemPathSections.Any())
+        {
+            return false;
+        }
+
+        string projectRootPath = selectedItemPathSections[0];
+
+        var folder = _treeItemData.First().Children!.Single(x => x.Value!.Path == projectRootPath);
+
+        if (folder.Value!.ProjectRoot)
+        {
+            return true;
+        }
+
+        foreach (var section in selectedItemPathSections.Skip(1))
+        {
+            projectRootPath += "/" + section;
+
+            folder = _treeItemData.Single(x => x.Value!.Path == projectRootPath);
+
+            if (folder.Value!.ProjectRoot)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private async Task RenameItemAsync(TreeItemData<FolderTreeItem> item)
+    {
+        DialogOptions options = new() { CloseOnEscapeKey = true };
+        DialogParameters<RenameDialog> parameters = new()
+        {
+            { "Item", item },
+            { "Type", item.Value!.Type is FolderTreeItemType.Folder ? "Folder" : "File" }
+        };
+
+        var dialog = await DialogService.ShowAsync<RenameDialog>(item.Value.Name, parameters, options);
+        await dialog.Result;
+    }
+
+    private async Task DeleteItemAsync(TreeItemData<FolderTreeItem> item)
+    {
+        var result = await TreeItemsService.DeleteAsync(item.Value!);
+
+        if (!result)
+        {
+            Snackbar.Add($"Unable to delete {item.Value!.Path}.", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Successfully deleted.", Severity.Success);
+
+        TreeItemData<FolderTreeItem> parent = null;
+
+        if (!item.Value!.Path.Contains('/'))
+        {
+            parent = _treeItemData.First();
+        }
+        else if (!_itemsMap.TryGetValue(item.Value!.Path.Substring(0, item.Value.Path.LastIndexOf('/')), out parent))
+        {
+            return;
+        }
+
+        parent.Children!.Remove(item);
         StateHasChanged();
     }
 }

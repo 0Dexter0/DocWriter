@@ -1,5 +1,5 @@
 using DocWriter.Shared.Models;
-using DocWriter.Shared.Providers;
+using DocWriter.Shared.Services;
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
 
@@ -19,7 +19,7 @@ public partial class PresentationMode : ComponentBase
     private readonly List<string> _files = [];
 
     [Inject]
-    private ITreeItemsProvider TreeItemsProvider { get; init; }
+    private ITreeItemsService TreeItemsProvider { get; init; }
 
     protected override async Task OnInitializedAsync()
     {

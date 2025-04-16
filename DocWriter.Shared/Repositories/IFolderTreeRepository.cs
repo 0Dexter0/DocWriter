@@ -8,7 +8,7 @@ public interface IFolderTreeRepository
 
     Task<FolderTreeItem> CreateFolderTreeItemAsync(FolderTreeItem item);
 
-    Task<FolderTreeItem> UpdateFolderTreeItemAsync(FolderTreeItem item);
+    Task<FolderTreeItem> UpdateFolderTreeItemAsync(RenameFolderTreeItem item);
 
-    Task DeleteFolderTreeItemAsync(FolderTreeItem item);
+    Task<bool> DeleteFolderTreeItemAsync(FolderTreeItem item);
 }

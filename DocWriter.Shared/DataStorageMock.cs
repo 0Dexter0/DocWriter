@@ -33,7 +33,7 @@ sequenceDiagram
         }
     ];
 
-    public static FolderTreeItem[] FolderTreeMock =
+    public static List<FolderTreeItem> FolderTreeMock =
     [
         new("F1", "F1", FolderTreeItemType.Folder, true, true),
         new("Images", "F1/Images", FolderTreeItemType.Folder),
