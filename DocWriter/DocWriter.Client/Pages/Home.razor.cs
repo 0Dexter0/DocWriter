@@ -1,4 +1,5 @@
 ﻿using DocWriter.Client.Components;
+using DocWriter.Client.StateContainers;
 using DocWriter.Shared;
 using DocWriter.Shared.Models;
 using DocWriter.Shared.Repositories;
@@ -12,16 +13,12 @@ namespace DocWriter.Client.Pages;
 
 public partial class Home : IDisposable
 {
+    private const double MaxTreeWidth = 600;
     private string _markdownValue;
-    private bool _isFullScreen;
-    private bool _editMode;
     private bool _disposed;
     private string _editFilePath;
-    private FolderTreeItem _selectedItem;
-    private string _visibility = "visible";
-    private bool _isDrawerOpen = true;
-    private readonly List<TreeItemData<FolderTreeItem>> _treeItemData = [];
-    private readonly Dictionary<string, TreeItemData<FolderTreeItem>> _itemsMap = [];
+    private bool _isResizing;
+    private double _resizeStartX;
 
     [Inject]
     private IJSRuntime JsRuntime { get; init; }
@@ -44,6 +41,9 @@ public partial class Home : IDisposable
     [Inject]
     private ISnackbar Snackbar { get; init; }
 
+    [Inject]
+    private IHomeStateContainer HomeStateContainer { get; init; }
+
     [JSInvokable]
     public void StateHasChangedFromJs()
     {
@@ -53,8 +53,8 @@ public partial class Home : IDisposable
     [JSInvokable]
     public void ToggleFullScreen()
     {
-        EditorFullScreenModeValueHolder.InvokeFullScreenChanged(!_isFullScreen);
-        _isFullScreen = !_isFullScreen;
+        EditorFullScreenModeValueHolder.InvokeFullScreenChanged(!HomeStateContainer.IsFullScreen);
+        HomeStateContainer.IsFullScreen = !HomeStateContainer.IsFullScreen;
         StateHasChanged();
     }
 
@@ -69,31 +69,34 @@ public partial class Home : IDisposable
         NavigationManager.LocationChanged += NavigationManagerOnLocationChanged;
         NavigateToElement();
 
-        TreeItemData<FolderTreeItem> root = new()
+        if (!HomeStateContainer.TreeItemData.Any())
         {
-            Icon = Icons.Material.Filled.Folder,
-            Expandable = false,
-            Text = "Root",
-            Value = new("Root", String.Empty, FolderTreeItemType.Folder)
-        };
-
-        var folderTreeItems = await TreeItemsService.GetTreeItemsAsync(
-            new(string.Empty, string.Empty, FolderTreeItemType.Folder));
-        _treeItemData.Add(root);
-        _itemsMap[String.Empty] = root;
-
-        if (folderTreeItems.Any())
-        {
-            root.Children = folderTreeItems.ToList();
-            root.Expandable = true;
-            root.Expanded = true;
-
-            foreach (var item in folderTreeItems)
+            TreeItemData<FolderTreeItem> root = new()
             {
-                _itemsMap[item.Value!.Path] = item;
-            }
+                Icon = Icons.Material.Filled.Folder,
+                Expandable = false,
+                Text = "Root",
+                Value = new("Root", String.Empty, FolderTreeItemType.Folder)
+            };
 
-            StateHasChanged();
+            var folderTreeItems = await TreeItemsService.GetTreeItemsAsync(
+                new(string.Empty, string.Empty, FolderTreeItemType.Folder));
+            HomeStateContainer.TreeItemData.Add(root);
+            HomeStateContainer.ItemsMap[String.Empty] = root;
+
+            if (folderTreeItems.Any())
+            {
+                root.Children = folderTreeItems.ToList();
+                root.Expandable = true;
+                root.Expanded = true;
+
+                foreach (var item in folderTreeItems)
+                {
+                    HomeStateContainer.ItemsMap[item.Value!.Path] = item;
+                }
+
+                StateHasChanged();
+            }
         }
 
         EditorFullScreenModeValueHolder.IsFullScreenChanged += FullScreenVisibilityHandler;
@@ -126,6 +129,7 @@ public partial class Home : IDisposable
         {
             EditorFullScreenModeValueHolder.IsFullScreenChanged -= FullScreenVisibilityHandler;
             NavigationManager.LocationChanged -= NavigationManagerOnLocationChanged;
+            HomeStateContainer.EditMode = false;
         }
 
         _disposed = true;
@@ -137,7 +141,7 @@ public partial class Home : IDisposable
 
         foreach (var item in items)
         {
-            _itemsMap[item.Value!.Path] = item;
+            HomeStateContainer.ItemsMap[item.Value!.Path] = item;
         }
 
         return items;
@@ -174,31 +178,39 @@ public partial class Home : IDisposable
 
     private void FullScreenVisibilityHandler(object _, bool b)
     {
-        _visibility = b ? "hidden" : "visible";
+        HomeStateContainer.Visibility = b ? "hidden" : "visible";
         StateHasChanged();
     }
 
-    private void ToggleDrawer() => _isDrawerOpen = !_isDrawerOpen;
+    private void ToggleDrawer() => HomeStateContainer.IsDrawerOpen = !HomeStateContainer.IsDrawerOpen;
 
     private async Task EditItemAsync(string filePath)
     {
-        _editMode = true;
+        HomeStateContainer.EditMode = true;
         _editFilePath = filePath;
 
         string fileContent = await FileContentRepository.GetFileContentAsync(filePath);
         _markdownValue = fileContent;
+        StateHasChanged();
 
         var module =
             await JsRuntime.InvokeAsync<IJSObjectReference>("import", "./modules/mermaidmodule.js");
         await module.InvokeVoidAsync("editorStateChangingHandler", DotNetObjectReference.Create(this));
+        StateHasChanged();
     }
 
-    private void CancelEdit() => _editMode = false;
+    private void CancelEdit()
+    {
+        HomeStateContainer.EditMode = false;
+        _markdownValue = null;
+    }
 
     private async Task SaveAsync()
     {
         await FileContentRepository.UpdateFileContentAsync(_editFilePath, _markdownValue);
-        _editMode = false;
+        HomeStateContainer.EditMode = false;
+        _markdownValue = null;
+
         StateHasChanged();
     }
 
@@ -213,7 +225,7 @@ public partial class Home : IDisposable
 
         string projectRootPath = selectedItemPathSections[0];
 
-        var folder = _treeItemData.First().Children!.Single(x => x.Value!.Path == projectRootPath);
+        var folder = HomeStateContainer.TreeItemData.First().Children!.Single(x => x.Value!.Path == projectRootPath);
 
         if (folder.Value!.ProjectRoot)
         {
@@ -224,7 +236,7 @@ public partial class Home : IDisposable
         {
             projectRootPath += "/" + section;
 
-            folder = _treeItemData.Single(x => x.Value!.Path == projectRootPath);
+            folder = HomeStateContainer.TreeItemData.Single(x => x.Value!.Path == projectRootPath);
 
             if (folder.Value!.ProjectRoot)
             {
@@ -264,9 +276,9 @@ public partial class Home : IDisposable
 
         if (!item.Value!.Path.Contains('/'))
         {
-            parent = _treeItemData.First();
+            parent = HomeStateContainer.TreeItemData.First();
         }
-        else if (!_itemsMap.TryGetValue(item.Value!.Path.Substring(0, item.Value.Path.LastIndexOf('/')), out parent))
+        else if (!HomeStateContainer.ItemsMap.TryGetValue(item.Value!.Path.Substring(0, item.Value.Path.LastIndexOf('/')), out parent))
         {
             return;
         }

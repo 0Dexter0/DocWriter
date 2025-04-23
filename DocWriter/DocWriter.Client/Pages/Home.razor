@@ -2,17 +2,16 @@
 @using DocWriter.Shared.Models
 
 <MudGrid Style="height: 100%;">
-    <div style="visibility: @_visibility">
+    <div style="visibility: @HomeStateContainer.Visibility">
         <MudItem>
-            <MudDrawer @bind-Open="@_isDrawerOpen" Anchor="Anchor.Left" Width="300px" Variant="DrawerVariant.Mini" ClipMode="DrawerClipMode.Always">
+            <MudDrawer @bind-Open="@HomeStateContainer.IsDrawerOpen" Anchor="Anchor.Left" Width="300px" Variant="DrawerVariant.Mini" ClipMode="DrawerClipMode.Always" Class="flex-shrink-1">
                 <MudDrawerHeader>
-                    <MudIconButton @onclick="ToggleDrawer" Icon="@(_isDrawerOpen ? Icons.Material.Filled.ArrowLeft : Icons.Material.Filled.ArrowRight)" Style="margin-left: -20px;"/>
+                    <MudIconButton @onclick="ToggleDrawer" Icon="@(HomeStateContainer.IsDrawerOpen ? Icons.Material.Filled.ArrowLeft : Icons.Material.Filled.ArrowRight)" Style="margin-left: -20px;"/>
                 </MudDrawerHeader>
-                @* @if (_isDrawerOpen) *@
-                <MudDrawerContainer Class="@("mud-height-full " + (!_isDrawerOpen ? "overflow-x-hidden" : ""))" Style="@("visibility: " + (_isDrawerOpen ? "visible" : "hidden"))">
+                <MudDrawerContainer Class="@("mud-height-full " + (!HomeStateContainer.IsDrawerOpen ? "overflow-x-hidden" : ""))" Style="@("visibility: " + (HomeStateContainer.IsDrawerOpen ? HomeStateContainer.Visibility : "hidden"))">
                     <MudPaper Width="300px" Height="100%" Elevation="0">
                         <MudStack AlignItems="AlignItems.Start" Class="mud-hidden">
-                            <MudTreeView Items="@_treeItemData" @bind-SelectedValue="@_selectedItem"
+                            <MudTreeView Items="@HomeStateContainer.TreeItemData" @bind-SelectedValue="@HomeStateContainer.SelectedItem"
                                          SelectionMode="SelectionMode.ToggleSelection" ServerData="ServerData"
                                          Width="300px">
                                 <ItemTemplate Context="context">
@@ -76,23 +75,32 @@
     </div>
     <MudItem Class="mud-width-full">
         <div class="ma-5 mud-height-full">
-            @if (!_editMode && _selectedItem?.Type is FolderTreeItemType.Markdown)
+            @if (!HomeStateContainer.EditMode && HomeStateContainer.SelectedItem?.Type is FolderTreeItemType.Markdown)
             {
-                <Preview FilePath="@_selectedItem?.Path" />
+                <Preview FilePath="@HomeStateContainer.SelectedItem?.Path" />
             }
-            @if (_editMode)
+            @if (HomeStateContainer.EditMode)
             {
-                <MarkdownEditor
-                    Value="@_markdownValue" ValueChanged="@OnMarkdownValueChanged"
-                    ImageUploadEndpoint="@(NavigationManager.BaseUri + "api/images")"
-                    UploadImage="true"
-                    MaxHeight="calc(0.6 * 100vh)">
-                </MarkdownEditor>
-                <MudStack Row>
-                    <MudSpacer />
-                    <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Cancel" Color="Color.Error" Size="Size.Small" OnClick="CancelEdit">Cancel</MudButton>
-                    <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Save" Color="Color.Success" Size="Size.Small" OnClick="SaveAsync">Save</MudButton>
-                </MudStack>
+                @if (_markdownValue is null)
+                {
+                    <div style="display: flex; justify-content: center; align-items: center; height: 100%; width: 100%; overflow: unset">
+                        <MudProgressCircular Color="Color.Primary" Indeterminate="true"/>
+                    </div>
+                }
+                else
+                {
+                    <MarkdownEditor
+                        Value="@_markdownValue" ValueChanged="@OnMarkdownValueChanged"
+                        ImageUploadEndpoint="@(NavigationManager.BaseUri + "api/images")"
+                        UploadImage="true"
+                        MaxHeight="calc(0.6 * 100vh)">
+                    </MarkdownEditor>
+                    <MudStack Row>
+                        <MudSpacer/>
+                        <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Cancel" Color="Color.Error" Size="Size.Small" OnClick="CancelEdit">Cancel</MudButton>
+                        <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Save" Color="Color.Success" Size="Size.Small" OnClick="SaveAsync">Save</MudButton>
+                    </MudStack>
+                }
             }
         </div>
     </MudItem>
