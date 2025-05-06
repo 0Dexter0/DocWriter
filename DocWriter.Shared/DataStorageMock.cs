@@ -28,7 +28,58 @@ sequenceDiagram
         },
         new()
         {
-            Content = "file2 content",
+            Content = """
+                      # file2 content
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      [ref](#file2-content)
+                      """,
             Path = "F1/M2.md"
         }
     ];

@@ -1,30 +1,86 @@
+using DocWriter.Client.StateContainers;
 using DocWriter.Shared.Models;
 using DocWriter.Shared.Services;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Routing;
+using Microsoft.JSInterop;
 using MudBlazor;
 
 namespace DocWriter.Client.Pages;
 
-public partial class PresentationMode : ComponentBase
+public partial class PresentationMode : ComponentBase, IAsyncDisposable
 {
     private const string DefaultTitle = "Presentation Mode";
 
     private bool _isDrawerOpen;
     private bool _isPresentationModeActive;
     private FolderTreeItem _selectedItem;
+    private IJSObjectReference _pageModule;
 
     private string _title = DefaultTitle;
     private string _currentFilePath = String.Empty;
-    private readonly List<TreeItemData<FolderTreeItem>> _treeItemData = [];
+
     private readonly List<string> _files = [];
+    private readonly List<(string Reference, string Title)> _anchors = [];
 
     [Inject]
     private ITreeItemsService TreeItemsProvider { get; init; }
 
+    [Inject]
+    private IPresentationStateContainer StateContainer { get; init; }
+
+    [Inject]
+    private IJSRuntime JsRuntime { get; init; }
+
+    [Inject]
+    private NavigationManager NavigationManager { get; init; }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_pageModule != null)
+        {
+            await _pageModule.DisposeAsync();
+        }
+
+        NavigationManager.LocationChanged -= NavigationManagerOnLocationChanged;
+    }
+
+    [JSInvokable]
+    public void AddAnchor(string anchor, string title)
+    {
+        _anchors.Add((anchor, title));
+
+        if (!_isDrawerOpen)
+        {
+            _isDrawerOpen = true;
+        }
+
+        StateHasChanged();
+    }
+
     protected override async Task OnInitializedAsync()
     {
-        _treeItemData.AddRange(
-            await TreeItemsProvider.GetTreeItemsAsync(new(string.Empty, string.Empty, FolderTreeItemType.Folder)));
+        _pageModule = await JsRuntime.InvokeAsync<IJSObjectReference>("import", "/PresentationMode.js");
+        if (!StateContainer.TreeItemData.Any())
+        {
+            StateContainer.TreeItemData.AddRange(
+                await TreeItemsProvider.GetTreeItemsAsync(new(string.Empty, string.Empty, FolderTreeItemType.Folder)));
+        }
+
+        if (NavigationManager.Uri.Contains('#'))
+        {
+            NavigationManager.NavigateTo(NavigationManager.Uri.Split('#')[0]);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // if (_isPresentationModeActive && !_isHandlerCalled)
+        if (_isPresentationModeActive)
+        {
+            await _pageModule.InvokeVoidAsync("previewHandler", DotNetObjectReference.Create(this));
+            // _isHandlerCalled = true;
+        }
     }
 
     private void ToggleDrawer()
@@ -39,14 +95,17 @@ public partial class PresentationMode : ComponentBase
         TreeItemData<FolderTreeItem> treeItemData,
         IReadOnlyCollection<TreeItemData<FolderTreeItem>> children) => treeItemData.Children = children?.ToList();
 
-    private void StartPresentation()
+    private void StartPresentation(string filePath)
     {
         if (!IsSelectedItemInProject(out var name, out var projectFolder))
         {
             return;
         }
 
-        CollectFilesInProject(projectFolder);
+        foreach (var file in CollectFilesInProject(projectFolder))
+        {
+            _files.Add(file);
+        }
 
         if (!_files.Any())
         {
@@ -55,14 +114,21 @@ public partial class PresentationMode : ComponentBase
 
         _title = name;
         _isPresentationModeActive = true;
-        _currentFilePath = _files[0];
+        _currentFilePath = _files.Single(x => x == filePath);
     }
 
     private void EndPresentation()
     {
         _isPresentationModeActive = false;
+        _isDrawerOpen = false;
         _title = DefaultTitle;
         _files.Clear();
+        _anchors.Clear();
+
+        if (NavigationManager.Uri.Contains('#'))
+        {
+            NavigationManager.NavigateTo(NavigationManager.Uri.Split('#')[0]);
+        }
     }
 
     private bool IsSelectedItemInProject(out string name, out TreeItemData<FolderTreeItem> projectFolder)
@@ -79,7 +145,7 @@ public partial class PresentationMode : ComponentBase
 
         string projectRootPath = selectedItemPathSections[0];
 
-        var folder = _treeItemData.Single(x => x.Value!.Path == projectRootPath);
+        var folder = StateContainer.TreeItemData.Single(x => x.Value!.Path == projectRootPath);
 
         if (folder.Value!.ProjectRoot)
         {
@@ -93,7 +159,7 @@ public partial class PresentationMode : ComponentBase
         {
             projectRootPath += "/" + section;
 
-            folder = _treeItemData.Single(x => x.Value!.Path == projectRootPath);
+            folder = StateContainer.TreeItemData.Single(x => x.Value!.Path == projectRootPath);
 
             if (folder.Value!.ProjectRoot)
             {
@@ -110,10 +176,11 @@ public partial class PresentationMode : ComponentBase
         return false;
     }
 
-    private void CollectFilesInProject(TreeItemData<FolderTreeItem> projectFolder)
+    private string[] CollectFilesInProject(TreeItemData<FolderTreeItem> projectFolder)
     {
         var files = GetFiles(projectFolder);
-        _files.AddRange(files.Select(x => x.Path));
+
+        return files.Select(x => x.Path).ToArray();
     }
 
     private FolderTreeItem[] GetFiles(TreeItemData<FolderTreeItem> folder)
@@ -131,7 +198,41 @@ public partial class PresentationMode : ComponentBase
         return files.ToArray();
     }
 
-    private void GoPrevious() => _currentFilePath = _files[_files.IndexOf(_currentFilePath) - 1];
+    private void GoPrevious()
+    {
+        _anchors.Clear();
+        _isDrawerOpen = false;
+        _currentFilePath = _files[_files.IndexOf(_currentFilePath) - 1];
+    }
 
-    private void GoNext() => _currentFilePath = _files[_files.IndexOf(_currentFilePath) + 1];
+    private void GoNext()
+    {
+        _anchors.Clear();
+        _isDrawerOpen = false;
+        _currentFilePath = _files[_files.IndexOf(_currentFilePath) + 1];
+    }
+
+    private void NavigationManagerOnLocationChanged(object sender, LocationChangedEventArgs e) => NavigateToElement();
+
+    private void NavigateToElement()
+    {
+        var url = NavigationManager.Uri;
+        var fragment = new Uri(url).Fragment;
+
+        if (string.IsNullOrEmpty(fragment))
+        {
+            return;
+        }
+
+        var elementId = fragment.StartsWith("#") ? fragment.Substring(1) : fragment;
+
+        if (string.IsNullOrEmpty(elementId))
+        {
+            return;
+        }
+
+        ScrollToElementId(elementId);
+    }
+
+    private void ScrollToElementId(object elementId) => JsRuntime.InvokeVoidAsync("scrollToElementId", elementId).GetAwaiter().GetResult();
 }

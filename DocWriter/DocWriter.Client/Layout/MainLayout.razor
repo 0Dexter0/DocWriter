@@ -22,7 +22,7 @@ else
                 <MudDivider Vertical Class="ml-3"/>
                 <MudToolBar>
                     <MudButton Href="/" EndIcon="@Icons.Material.Filled.Edit">Editor</MudButton>
-                    <MudButton Href="/presentation" EndIcon="@Icons.Material.Filled.PresentToAll" Class="ml-5">Presentation Mode</MudButton>
+                    <MudButton Href="/presentation/" EndIcon="@Icons.Material.Filled.PresentToAll" Class="ml-5">Presentation Mode</MudButton>
                 </MudToolBar>
                 <MudSpacer/>
                 <MudIconButton Icon="@Icons.Material.Filled.MoreVert" Color="Color.Inherit" Edge="Edge.End"/>
@@ -40,6 +40,9 @@ else
 
     [Inject]
     private IEditorFullScreenModeValueHolder EditorFullScreenModeValueHolder { get; init; }
+
+    [Inject]
+    private NavigationManager NavigationManager { get; init; }
 
     protected override void OnInitialized()
     {

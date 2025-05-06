@@ -12,6 +12,7 @@ builder.Services.AddCommonServices();
 
 var app = builder.Build();
 
+app.UsePathBase("/");
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {

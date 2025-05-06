@@ -43,8 +43,11 @@ public partial class Preview : ComponentBase
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        IJSObjectReference mermaidModule =
-            await JsRuntime.InvokeAsync<IJSObjectReference>("import", "./modules/mermaidmodule.js");
-        await mermaidModule.InvokeVoidAsync("Initialize");
+        if (_content is not "")
+        {
+            IJSObjectReference mermaidModule =
+                await JsRuntime.InvokeAsync<IJSObjectReference>("import", "./modules/mermaidmodule.js");
+            await mermaidModule.InvokeVoidAsync("Initialize");
+        }
     }
 }

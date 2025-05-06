@@ -13,12 +13,9 @@ namespace DocWriter.Client.Pages;
 
 public partial class Home : IDisposable
 {
-    private const double MaxTreeWidth = 600;
     private string _markdownValue;
     private bool _disposed;
     private string _editFilePath;
-    private bool _isResizing;
-    private double _resizeStartX;
 
     [Inject]
     private IJSRuntime JsRuntime { get; init; }

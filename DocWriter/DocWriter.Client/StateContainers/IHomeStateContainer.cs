@@ -18,6 +18,4 @@ internal interface IHomeStateContainer
     bool EditMode { get; set; }
 
     string Visibility { get; set; }
-
-    double TreeWidth { get; set; }
 }

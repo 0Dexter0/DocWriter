@@ -1,13 +1,13 @@
-@page "/presentation"
+@page "/presentation/"
 @using DocWriter.Shared.Models
 
 <PageTitle>@_title</PageTitle>
 
-<MudGrid Class="mud-height-full">
-    <MudItem Class="flex-1 mud-height-full">
+<MudGrid Class="mud-height-full mt-0">
+    <MudItem Class="flex-1 mud-height-full pt-2">
         @if (!_isPresentationModeActive)
         {
-            <MudTreeView Items="@_treeItemData" @bind-SelectedValue="@_selectedItem"
+            <MudTreeView Items="@StateContainer.TreeItemData" @bind-SelectedValue="@_selectedItem"
                          SelectionMode="SelectionMode.ToggleSelection" ServerData="LoadServerData" Style="min-width: 300px">
                 <ItemTemplate>
                     <MudTreeViewItem
@@ -21,7 +21,7 @@
                         IconExpanded="@Icons.Custom.Uncategorized.FolderOpen"
                         LoadingIconColor="Color.Info"
                         IconColor="@(context.Value!.ProjectRoot ? Color.Tertiary : Color.Default)"
-                        OnDoubleClick="StartPresentation">
+                        OnDoubleClick="@(() => StartPresentation(context.Value.Path))">
                     </MudTreeViewItem>
                 </ItemTemplate>
             </MudTreeView>
@@ -35,14 +35,14 @@
                     Size="Size.Medium"
                     Style="position: absolute; top: 10px; right: 10px; z-index: 1;"
                     Color="Color.Warning"/>
-                <div class="flex-grow-1 mud-height-full" style="position: relative; overflow: auto;">
+                <div class="flex-grow-1 mud-height-full" style="position: relative; overflow: auto;" >
                     <div class="pt-5 pl-5 mud-height-full" id="preview">
                         <Preview FilePath="@_currentFilePath"/>
                     </div>
                 </div>
 
                 <MudContainer Fixed MaxWidth="MaxWidth.Large" Class="">
-                    <MudPaper Class="pa-2" Elevation="1">
+                    <MudPaper Class="ma-2" Elevation="1">
                         <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
 
                             <MudIconButton OnClick="GoPrevious"
@@ -85,7 +85,10 @@
             @if (_isDrawerOpen)
             {
                 <MudNavMenu>
-                    <MudNavLink Href="/">Home</MudNavLink>
+                    @foreach (var item in _anchors)
+                    {
+                        <MudNavLink Href="@item.Reference" Class="pl-2 pr-2">@item.Title</MudNavLink>
+                    }
                 </MudNavMenu>
             }
         </MudDrawer>

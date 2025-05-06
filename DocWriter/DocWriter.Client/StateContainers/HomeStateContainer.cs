@@ -18,6 +18,4 @@ internal class HomeStateContainer : IHomeStateContainer
     public bool EditMode { get; set; }
 
     public string Visibility { get; set; } = "visible";
-
-    public double TreeWidth { get; set; }
 }
