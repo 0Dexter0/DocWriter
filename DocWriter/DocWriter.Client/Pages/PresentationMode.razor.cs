@@ -125,10 +125,7 @@ public partial class PresentationMode : ComponentBase, IAsyncDisposable
         _files.Clear();
         _anchors.Clear();
 
-        if (NavigationManager.Uri.Contains('#'))
-        {
-            NavigationManager.NavigateTo(NavigationManager.Uri.Split('#')[0]);
-        }
+        NavigationManager.NavigateTo(NavigationManager.Uri);
     }
 
     private bool IsSelectedItemInProject(out string name, out TreeItemData<FolderTreeItem> projectFolder)

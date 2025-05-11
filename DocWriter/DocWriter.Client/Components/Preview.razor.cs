@@ -1,3 +1,4 @@
+using DocWriter.Shared;
 using DocWriter.Shared.Repositories;
 using Markdig;
 using Microsoft.AspNetCore.Components;
@@ -36,6 +37,7 @@ public partial class Preview : ComponentBase
             new MarkdownPipelineBuilder()
                 .UseAdvancedExtensions()
                 .UseDiagrams()
+                .UseMudBlazorTable()
                 .Build());
 
         _showProgressBar = false;
